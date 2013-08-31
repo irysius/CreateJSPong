@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title></title>
+        <script src="/javascript/jquery-1.8.2.min.js"></script>
+        <script src="/javascript/easeljs-0.6.1.min.js"></script>
+        <script src="/javascript/preloadjs-0.3.1.min.js"></script>
+    </head>
+    <body>
+        <button id="btn-start">Start/Reset Game</button>
+        <canvas id="main-canvas"></canvas>
+        <script>
+            $(function () {
+                initializeGame();
+            });
+
+            var canvas, stage, preload;
+            var paddle1Image, paddle2Image, ballImage;
+            var paddle1Bitmap, paddle2Bitmap, ballBitmap;
+
+            var paddle1Y = 0, paddle2Y = 0, ballX = 0, ballY = 0;
+            var score1 = 0, score2 = 0;
+            var score1Text, score2Text;
+            var ballIsInMotion = false;
+            var isPlayer1Serving = true;
+            var ballVX = 0; ballVY = 0;
+
+            function initializeGame() {
+                canvas = document.getElementById('main-canvas');
+                canvas.height = 450;
+                canvas.width = 700;
+                stage = new createjs.Stage(canvas);
+                preload = new createjs.LoadQueue(true);
+
+                var manifest = [
+                    { id: "backgroundImage", src: "/images/grid.png" },
+                    { id: "paddle1Image", src: "/images/paddle1.png" },
+                    { id: "paddle2Image", src: "/images/paddle2.png" },
+                    { id: "ballImage", src: "/images/ball.png" }
+                ];
+
+                preload.addEventListener("complete", prepareAssets);
+                preload.loadManifest(manifest);
+            }
+
+            function prepareAssets() {
+                paddle1Image = preload.getResult("paddle1Image");
+                paddle1Bitmap = new createjs.Bitmap(paddle1Image);
+
+                paddle2Image = preload.getResult("paddle2Image");
+                paddle2Bitmap = new createjs.Bitmap(paddle2Image);
+                paddle2Bitmap.y = 0;
+
+                ballImage = preload.getResult("ballImage");
+                ballBitmap = new createjs.Bitmap(ballImage);
+                ballBitmap.regX = ballImage.width / 2;
+                ballBitmap.regY = ballImage.height / 2;
+
+                backgroundImage = preload.getResult("backgroundImage");
+                backgroundBitmap = new createjs.Bitmap(backgroundImage);
+
+                score1Text = new createjs.Text("P1: " + score1, "20px sans-serif", "Dark Red");
+                score1Text.y = 5;
+                score1Text.x = 15;
+                score2Text = new createjs.Text("P2: " + score2, "20px sans-serif", "Dark Red");
+                score2Text.y = 5;
+                score2Text.x = canvas.width - 15 - score2Text.getMeasuredWidth();
+
+                stage.addChild(backgroundBitmap);
+                stage.addChild(ballBitmap);
+                stage.addChild(paddle2Bitmap);
+                stage.addChild(paddle1Bitmap);
+                stage.addChild(score1Text);
+                stage.addChild(score2Text);
+                stage.mouseMoveOutside = true;
+                stage.onMouseMove = movePaddle;
+                stage.addEventListener("click", serveBall);
+
+                startGame();
+            }
+
+            function startGame() {
+                createjs.Ticker.setInterval(window.requestAnimationFrame);
+                createjs.Ticker.addListener(gameLoop);
+            }
+
+            function gameLoop() {
+                update();
+                draw();
+            }
+
+            function update() {
+                if (ballIsInMotion) {
+                    ballX += ballVX;
+                    ballY += ballVY;
+                } else {
+                    if (isPlayer1Serving) {
+                        ballY = paddle1Y + paddle1Image.height / 2;
+                        ballX = paddle1Image.width + ballImage.width / 2;
+                    } else {
+                        ballY = paddle2Y + paddle2Image.height / 2;
+                        ballX = canvas.width - paddle2Image.width - ballImage.width / 2;
+                    }
+                }
+
+                if (ballY - ballImage.height / 2 < 0) {
+                    ballY = ballImage.height / 2;
+                    ballVY = -ballVY;
+                }
+                if (ballY + ballImage.height / 2 > canvas.height) {
+                    ballY = canvas.height - ballImage.height / 2;
+                    ballVY = -ballVY;
+                }
+                if (ballX - ballImage.width / 2 < paddle1Image.width) {
+                    if (paddle1Y - ballImage.height / 3 < ballY && ballY < paddle1Y + paddle1Image.height * 4 / 3) {
+                        ballX = paddle1Image.width + ballImage.width / 2;
+                        if (ballVY < 0) {
+                            ballVY = ballVY - Math.random() + 0.5;
+                            if (ballVY > -0.5)
+                                ballVY = -3;
+                        } else {
+                            ballVY = ballVY + Math.random() - 0.5;
+                            if (ballVY < 0.5)
+                                ballVY = 3;
+                        }
+                        ballVX = -ballVX + Math.random() / 2;
+                        if (ballVX < 0)
+                            ballVX = 3;
+                    } else {
+                        ballIsInMotion = false;
+                        isPlayer1Serving = true;
+                        score2++;
+                        score2Text.text = "P2: " + score2;
+                        ballVX = 0;
+                        ballVY = 0;
+                    }
+                }
+                if (ballX + ballImage.width / 2 > canvas.width - paddle2Image.width) {
+                    if (paddle2Y - ballImage.height / 3 < ballY && ballY < paddle2Y + paddle2Image.height * 4 / 3) {
+                        ballX = canvas.width - paddle2Image.width - ballImage.width / 2;
+                        if (ballVY < 0) {
+                            ballVY = ballVY - Math.random() + 0.5;
+                            if (ballVY > -0.5)
+                                ballVY = -3;
+                        } else {
+                            ballVY = ballVY + Math.random() - 0.5;
+                            if (ballVY < 0.5)
+                                ballVY = 3;
+                        }
+                        ballVX = -ballVX - Math.random() / 2;
+                        if (ballVX > 0)
+                            ballVX = -3;
+                    } else {
+                        ballIsInMotion = false;
+                        isPlayer1Serving = false;
+                        score1++;
+                        score1Text.text = "P1: " + score1;
+                        ballVX = 0;
+                        ballVY = 0;
+                    }
+                }
+
+
+                ballBitmap.x = ballX;
+                ballBitmap.y = ballY;
+                paddle1Bitmap.y = paddle1Y;
+                paddle2Bitmap.y = paddle2Y;
+                paddle2Bitmap.x = canvas.width - paddle2Image.width;
+            }
+
+            function draw() {
+                stage.update();
+            }
+
+            function movePaddle(evt) {
+                var temp = evt.stageY - paddle1Image.height / 2;
+                if (temp < 0) {
+                    temp = 0;
+                }
+                if (temp > canvas.height - paddle1Image.height) {
+                    temp = canvas.height - paddle1Image.height;
+                }
+                paddle1Y = temp;
+                paddle2Y = temp;
+            }
+
+            function serveBall(evt) {
+                if (!ballIsInMotion) {
+                    ballIsInMotion = true;
+                    if (isPlayer1Serving) {
+                        ballVX = Math.random() * 2 + 1;
+                        ballVY = Math.random() + 1;
+                        if (Math.random() < 0.5)
+                            ballVY = -ballVY;
+                    } else {
+                        ballVX = -1 - Math.random() * 2;
+                        ballVY = Math.random() + 1;
+                        if (Math.random() < 0.5)
+                            ballVY = -ballVY;
+                    }
+                }
+            }
+        </script>
+    </body>
+</html>
